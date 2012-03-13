@@ -4,8 +4,7 @@
         ring.middleware.file
         ring.middleware.file-info
         ring.util.response
-        ring.adapter.jetty)
-  (:require [swank.swank :as swank]))
+        ring.adapter.jetty))
 
 (def ^{:dynamic true}
   *modified-namespaces* nil)
