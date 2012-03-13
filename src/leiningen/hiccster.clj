@@ -1,6 +1,8 @@
 (ns leiningen.hiccster
-  (:use ns-tracker.core
+  (:use hiccster
+        ns-tracker.core
         hiccup.core
+        ring.middleware.params
         ring.middleware.file
         ring.middleware.file-info
         ring.util.response
@@ -48,7 +50,8 @@
         ns (find-ns ns-sym)]
     (let [page (and ns (ns-resolve ns-sym 'page))]
       (cond page
-            (-> (page)
+            (-> (binding [*request* req]
+                  (page))
                 (html-response))
             (= (:uri req) "/")
             (page-index)
@@ -63,6 +66,7 @@
 
 (def handler
   (-> handle-page
+      (wrap-params)
       (wrap-file "static")
       (wrap-file-info)
       (wrap-logging)))
