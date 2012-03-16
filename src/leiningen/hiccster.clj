@@ -8,7 +8,7 @@
         ring.util.response
         ring.adapter.jetty))
 
-(def ^{:dynamic true}
+(def ^{:dynamic true :private true}
   *modified-namespaces* nil)
 
 (def *pages* (atom #{}))
@@ -64,7 +64,8 @@
     (log (:uri req))
     (handler req)))
 
-(def handler
+(def ^{:private true}
+  handler
   (-> handle-page
       (wrap-params)
       (wrap-file "static")
