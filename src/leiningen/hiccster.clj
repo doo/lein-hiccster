@@ -76,9 +76,7 @@
 (defn hiccster
   ([] (hiccster "src"))
   ([& args]
-     (try (println "loading init")
-          (require 'hiccster.init)
-          (println "loaded")
+     (try (require 'hiccster.init)
           (catch java.io.FileNotFoundException e))
      (alter-var-root (var *modified-namespaces*)
                      (constantly (ns-tracker args 0)))
