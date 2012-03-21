@@ -19,14 +19,15 @@
 
 (defn- reload-modified-namespaces []
   (doseq [ns-sym (*modified-namespaces*)]
-    (log "loading " ns-sym)
-    (require ns-sym :reload)
-    (let [ns      (find-ns ns-sym)
-          publics (and ns (ns-publics ns))
-          page    (get publics 'page)]
-      (if (and page (fn? @page))
-        (swap! *pages* conj ns-sym)
-        (swap! *pages* disj ns-sym)))))
+    (when-not (= (name ns-sym) "hiccster.init")
+      (log "loading " ns-sym)
+      (require ns-sym :reload)
+      (let [ns      (find-ns ns-sym)
+            publics (and ns (ns-publics ns))
+            page    (get publics 'page)]
+        (if (and page (fn? @page))
+          (swap! *pages* conj ns-sym)
+          (swap! *pages* disj ns-sym))))))
 
 (defn- html-response [page]
   (-> (html page)
@@ -75,6 +76,10 @@
 (defn hiccster
   ([] (hiccster "src"))
   ([& args]
+     (try (println "loading init")
+          (require 'hiccster.init)
+          (println "loaded")
+          (catch java.io.FileNotFoundException e))
      (alter-var-root (var *modified-namespaces*)
                      (constantly (ns-tracker args 0)))
      (reload-modified-namespaces)
