@@ -6,6 +6,10 @@ A hiccup page server plugin for Leiningen.
 
 `lein hiccster`
 
+## To Do
+
+Write proper documentation.
+
 ## License
 
 Copyright (C) 2012 Moritz Heidkamp, doo GmbH
