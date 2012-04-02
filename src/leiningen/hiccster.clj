@@ -39,10 +39,11 @@
    [:html [:head [:title "hiccster page index"]]
     [:body
      [:h1 "pages"]
-     [:ul (map (fn [page]
-                 [:li [:a {:href (str "/" page)}
-                       (str page)]])
-               (deref *pages*))]]]))
+     [:ul (-> (map (fn [page]
+                     [:li [:a {:href (str "/" page)}
+                           (str page)]])
+                   (sort (fn [a b] (compare (str a) (str b)))
+                         (map name (deref *pages*)))))]]]))
 
 (defn- handle-page [req]
   (reload-modified-namespaces)
