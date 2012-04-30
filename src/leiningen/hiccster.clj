@@ -17,10 +17,11 @@
   (println (str "[" (java.util.Date.) "]")
            (apply str msg)))
 
-(defn- reload-modified-namespaces []
+(defn- reload-modified-namespaces [quiet?]
   (doseq [ns-sym (*modified-namespaces*)]
     (when-not (= (name ns-sym) "hiccster.init")
-      (log "loading " ns-sym)
+      (when-not quiet?
+        (log "loading " ns-sym))
       (require ns-sym :reload)
       (let [ns      (find-ns ns-sym)
             publics (and ns (ns-publics ns))
@@ -46,7 +47,7 @@
                          (map name (deref *pages*)))))]]]))
 
 (defn- handle-page [req]
-  (reload-modified-namespaces)
+  (reload-modified-namespaces false)
   (let [ns-sym (->> (.substring (:uri req) 1)
                     (symbol))
         ns (find-ns ns-sym)]
@@ -74,12 +75,15 @@
       (wrap-file-info)
       (wrap-logging)))
 
+(defn init! [dirs & [quiet?]]
+  (try (require 'hiccster.init)
+       (catch java.io.FileNotFoundException e))
+  (alter-var-root (var *modified-namespaces*)
+                  (constantly (ns-tracker dirs 0)))
+  (reload-modified-namespaces quiet?))
+
 (defn hiccster
   ([] (hiccster "src"))
-  ([& args]
-     (try (require 'hiccster.init)
-          (catch java.io.FileNotFoundException e))
-     (alter-var-root (var *modified-namespaces*)
-                     (constantly (ns-tracker args 0)))
-     (reload-modified-namespaces)
+  ([& dirs]
+     (init! dirs)
      (run-jetty #'handler {:port 8765})))
