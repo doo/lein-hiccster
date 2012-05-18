@@ -13,6 +13,8 @@
 
 (def *pages* (atom #{}))
 
+(def root-namespace (atom nil))
+
 (defn- log [& msg]
   (println (str "[" (java.util.Date.) "]")
            (apply str msg)))
@@ -46,11 +48,23 @@
                    (sort (fn [a b] (compare (str a) (str b)))
                          (map name (deref *pages*)))))]]]))
 
+(defn- file-name->ns-sym [filename]
+
+  (-> (.substring (str filename) 0 (.lastIndexOf (str filename) "."))
+      (.replaceAll (str java.io.File/separatorChar) ".")))
+
 (defn- handle-page [req]
   (reload-modified-namespaces false)
   (let [ns-sym (->> (.substring (:uri req) 1)
+                    (file-name->ns-sym)
+                    (str @root-namespace ".")
                     (symbol))
+
+        ;; page-ext (if-let [ext (ns-ref page-ns 'file-extension)]
+        ;;            (deref ext)
+        ;;            "html")
         ns (find-ns ns-sym)]
+    (println "sym:" ns-sym)
     (let [page (and ns (ns-resolve ns-sym 'page))]
       (cond page
             (-> (binding [*request* req]
@@ -92,4 +106,5 @@
   ([project] (hiccster project "src"))
   ([project & dirs]
      (init! dirs)
+     (reset! root-namespace (:hiccster-root-namespace project))
      (run-jetty #'handler {:port (get (hiccster-config) :port 8765)})))
