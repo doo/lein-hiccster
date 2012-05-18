@@ -6,7 +6,8 @@
         ring.middleware.file
         ring.middleware.file-info
         ring.util.response
-        ring.adapter.jetty))
+        ring.adapter.jetty)
+  (:import java.io.File))
 
 (def ^{:dynamic true :private true}
   *modified-namespaces* nil)
@@ -37,44 +38,46 @@
       (response)
       (content-type "text/html; charset=UTF-8")))
 
+(defn- ns-ref [ns var-name]
+  (get (ns-publics ns) var-name))
+
+(defn- file-name->ns-sym [filename]
+  (-> (.substring (str filename) 0 (.lastIndexOf (str filename) "."))
+      (.replaceAll (str File/separatorChar) ".")))
+
+(defn- ns-sym->file-name [ns-sym]
+  (-> (str ns-sym)
+      (.replaceAll (str "^" (java.util.regex.Pattern/quote (str @root-namespace "."))) "")
+      (.replace \. File/separatorChar)
+      (.concat ".")
+      (.concat (or (ns-ref (find-ns ns-sym) 'file-extension) "html"))))
+
 (defn- page-index []
   (html-response
    [:html [:head [:title "hiccster page index"]]
     [:body
      [:h1 "pages"]
-     [:ul (-> (map (fn [page]
-                     [:li [:a {:href (str "/" page)}
-                           (str page)]])
-                   (sort (fn [a b] (compare (str a) (str b)))
-                         (map name (deref *pages*)))))]]]))
-
-(defn- file-name->ns-sym [filename]
-
-  (-> (.substring (str filename) 0 (.lastIndexOf (str filename) "."))
-      (.replaceAll (str java.io.File/separatorChar) ".")))
+     [:ul (map (fn [page]
+                 (let [file (ns-sym->file-name page)]
+                   [:li [:a {:href (str "/" file)} file]]))
+               (sort (fn [a b] (compare (str a) (str b)))
+                     (deref *pages*)))]]]))
 
 (defn- handle-page [req]
   (reload-modified-namespaces false)
-  (let [ns-sym (->> (.substring (:uri req) 1)
-                    (file-name->ns-sym)
-                    (str @root-namespace ".")
-                    (symbol))
-
-        ;; page-ext (if-let [ext (ns-ref page-ns 'file-extension)]
-        ;;            (deref ext)
-        ;;            "html")
-        ns (find-ns ns-sym)]
-    (println "sym:" ns-sym)
-    (let [page (and ns (ns-resolve ns-sym 'page))]
-      (cond page
-            (-> (binding [*request* req]
-                  (page))
-                (html-response))
-            (= (:uri req) "/")
-            (page-index)
-            :else
-            (-> (response (str "var " ns-sym "/page not found"))
-                (status 404))))))
+  (if (= (:uri req) "/")
+    (page-index)
+    (let [ns-sym (->> (.substring (:uri req) 1)
+                      (file-name->ns-sym)
+                      (str @root-namespace ".")
+                      (symbol))
+          ns (find-ns ns-sym)]
+      (if-let [page (and ns (ns-resolve ns-sym 'page))]
+        (-> (binding [*request* req]
+              (page))
+            (html-response))
+        (-> (response (str "var " ns-sym "/page not found"))
+            (status 404))))))
 
 (defn- wrap-logging [handler]
   (fn [req]
@@ -97,7 +100,7 @@
   (reload-modified-namespaces quiet?))
 
 (defn hiccster-config []
-  (let [file (java.io.File. ".hiccster")]
+  (let [file (File. ".hiccster")]
     (when (.exists file)
       (with-open [f (java.io.PushbackReader. (java.io.FileReader. file))]
         (read f)))))
