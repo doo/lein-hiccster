@@ -50,7 +50,9 @@
       (.replaceAll (str "^" (java.util.regex.Pattern/quote (str @root-namespace "."))) "")
       (.replace \. File/separatorChar)
       (.concat ".")
-      (.concat (or (ns-ref (find-ns ns-sym) 'file-extension) "html"))))
+      (.concat (if-let [ext (ns-ref (find-ns ns-sym) 'file-extension)]
+                 (deref ext)
+                 "html"))))
 
 (defn- page-index []
   (html-response
