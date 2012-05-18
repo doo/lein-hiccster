@@ -82,8 +82,14 @@
                   (constantly (ns-tracker dirs 0)))
   (reload-modified-namespaces quiet?))
 
+(defn hiccster-config []
+  (let [file (java.io.File. ".hiccster")]
+    (when (.exists file)
+      (with-open [f (java.io.PushbackReader. (java.io.FileReader. file))]
+        (read f)))))
+
 (defn hiccster
-  ([] (hiccster "src"))
-  ([& dirs]
+  ([project] (hiccster project "src"))
+  ([project & dirs]
      (init! dirs)
-     (run-jetty #'handler {:port 8765})))
+     (run-jetty #'handler {:port (get (hiccster-config) :port 8765)})))
