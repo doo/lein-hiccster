@@ -1,4 +1,4 @@
-(defproject lein-hiccster "0.1.1-SNAPSHOT"
+(defproject lein-hiccster "0.1.1"
   :description "A hiccup page server plugin for Leiningen"
   :dependencies [[org.clojure/clojure "1.3.0"]
                  [hiccup "1.0.0-beta1"]
