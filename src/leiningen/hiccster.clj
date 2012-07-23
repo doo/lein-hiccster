@@ -7,18 +7,43 @@
         ring.middleware.file-info
         ring.util.response
         ring.adapter.jetty)
-  (:import java.io.File))
+  (:import java.io.File
+           java.util.regex.Pattern))
 
 (def ^{:dynamic true :private true}
   *modified-namespaces* nil)
 
-(def *pages* (atom #{}))
+(def *pages* (ref #{}))
+(def page-ns->file-name (ref {}))
+(def file-name->page-ns (ref {}))
 
 (def root-namespace (atom nil))
 
 (defn- log [& msg]
   (println (str "[" (java.util.Date.) "]")
            (apply str msg)))
+
+
+(defn- ns-ref [ns var-name]
+  (get (ns-publics ns) var-name))
+
+(defn ns-sym->file-name [ns-sym suffix]
+  (let [ext (ns-ref (find-ns ns-sym) 'file-extension)
+        suffix (if ext (str "." (deref ext)) suffix)]
+    (-> (str ns-sym)
+        (.replaceFirst (str "^" (Pattern/quote (str @root-namespace "."))) "")
+        (.replace \. File/separatorChar)
+        (str suffix))))
+
+(defn page-ns-sym->file-name [ns-sym]
+  (ns-sym->file-name ns-sym ".html"))
+
+(defn update-pages [ns-sym coll-op map-op]
+  (let [file-name (page-ns-sym->file-name ns-sym)]
+    (dosync
+     (commute *pages* coll-op file-name)
+     (commute page-ns->file-name map-op ns-sym file-name)
+     (commute file-name->page-ns map-op file-name ns-sym))))
 
 (defn- reload-modified-namespaces [quiet?]
   (doseq [ns-sym (*modified-namespaces*)]
@@ -30,29 +55,13 @@
             publics (and ns (ns-publics ns))
             page    (get publics 'page)]
         (if (and page (fn? @page))
-          (swap! *pages* conj ns-sym)
-          (swap! *pages* disj ns-sym))))))
+          (update-pages ns-sym conj assoc)
+          (update-pages ns-sym disj dissoc))))))
 
 (defn- html-response [page]
   (-> (html page)
       (response)
       (content-type "text/html; charset=UTF-8")))
-
-(defn- ns-ref [ns var-name]
-  (get (ns-publics ns) var-name))
-
-(defn- file-name->ns-sym [filename]
-  (-> (.substring (str filename) 0 (.lastIndexOf (str filename) "."))
-      (.replaceAll (str File/separatorChar) ".")))
-
-(defn- ns-sym->file-name [ns-sym]
-  (-> (str ns-sym)
-      (.replaceAll (str "^" (java.util.regex.Pattern/quote (str @root-namespace "."))) "")
-      (.replace \. File/separatorChar)
-      (.concat ".")
-      (.concat (if-let [ext (ns-ref (find-ns ns-sym) 'file-extension)]
-                 (deref ext)
-                 "html"))))
 
 (defn- page-index []
   (html-response
@@ -60,8 +69,7 @@
     [:body
      [:h1 "pages"]
      [:ul (map (fn [page]
-                 (let [file (ns-sym->file-name page)]
-                   [:li [:a {:href (str "/" file)} file]]))
+                 [:li [:a {:href (str "/" page)} page]])
                (sort (fn [a b] (compare (str a) (str b)))
                      (deref *pages*)))]]]))
 
@@ -70,11 +78,8 @@
   (if (= (:uri req) "/")
     (page-index)
     (let [ns-sym (->> (.substring (:uri req) 1)
-                      (file-name->ns-sym)
-                      (str @root-namespace ".")
-                      (symbol))
-          ns (find-ns ns-sym)]
-      (if-let [page (and ns (ns-resolve ns-sym 'page))]
+                      (@file-name->page-ns))]
+      (if-let [page (and (find-ns ns-sym) (ns-resolve ns-sym 'page))]
         (-> (binding [*request* req]
               (page))
             (html-response))
@@ -110,6 +115,6 @@
 (defn hiccster
   ([project] (hiccster project "src"))
   ([project & dirs]
-     (init! dirs)
      (reset! root-namespace (:hiccster-root-namespace project))
+     (init! dirs)
      (run-jetty #'handler {:port (get (hiccster-config) :port 8765)})))
