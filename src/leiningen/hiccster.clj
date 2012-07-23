@@ -7,8 +7,7 @@
         ring.middleware.file-info
         ring.util.response
         ring.adapter.jetty)
-  (:import java.io.File
-           java.util.regex.Pattern))
+  (:import java.io.File))
 
 (def ^{:dynamic true :private true}
   *modified-namespaces* nil)
@@ -17,26 +16,9 @@
 (def page-ns->file-name (ref {}))
 (def file-name->page-ns (ref {}))
 
-(def root-namespace (atom nil))
-
 (defn- log [& msg]
   (println (str "[" (java.util.Date.) "]")
            (apply str msg)))
-
-
-(defn- ns-ref [ns var-name]
-  (get (ns-publics ns) var-name))
-
-(defn ns-sym->file-name [ns-sym suffix]
-  (let [ext (ns-ref (find-ns ns-sym) 'file-extension)
-        suffix (if ext (str "." (deref ext)) suffix)]
-    (-> (str ns-sym)
-        (.replaceFirst (str "^" (Pattern/quote (str @root-namespace "."))) "")
-        (.replace \. File/separatorChar)
-        (str suffix))))
-
-(defn page-ns-sym->file-name [ns-sym]
-  (ns-sym->file-name ns-sym ".html"))
 
 (defn update-pages [ns-sym coll-op map-op]
   (let [file-name (page-ns-sym->file-name ns-sym)]
@@ -79,7 +61,7 @@
     (page-index)
     (let [ns-sym (->> (.substring (:uri req) 1)
                       (@file-name->page-ns))]
-      (if-let [page (and (find-ns ns-sym) (ns-resolve ns-sym 'page))]
+      (if-let [page (and ns-sym (find-ns ns-sym) (ns-resolve ns-sym 'page))]
         (-> (binding [*request* req]
               (page))
             (html-response))
