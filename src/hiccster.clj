@@ -6,12 +6,9 @@
 
 (def root-namespace (atom nil))
 
-(defn- ns-ref [ns var-name]
-  (get (ns-publics ns) var-name))
-
 (defn ns-sym->file-name [ns-sym suffix]
-  (let [ext (ns-ref (find-ns ns-sym) 'file-extension)
-        suffix (if ext (str "." (deref ext)) suffix)]
+  (let [ext (get (meta (find-ns ns-sym)) :file-extension)
+        suffix (if ext (str "." ext) suffix)]
     (-> (str ns-sym)
         (.replaceFirst (str "^" (Pattern/quote (str @root-namespace "."))) "")
         (.replace \. File/separatorChar)
